@@ -374,11 +374,23 @@ RT64Context::RT64Context(uint8_t* rdram, ultramodern::renderer::WindowHandle win
     // The LeiaSR weaver is only implemented against D3D12, and RT64 may have
     // picked a different API than the user asked for (Automatic, or a fallback),
     // so this has to be read back from the app rather than from cur_config.
+    //
+    // There is no graphics-API option in the config menu, so this always comes
+    // from Automatic — which resolves to D3D12 on Windows, except under Wine,
+    // where RT64 deliberately prefers Vulkan over the D3D12 translation layer.
 #if defined(LEIASR_SUPPORTED)
     leiasr_supported = (app->chosenGraphicsAPI == RT64::UserConfiguration::GraphicsAPI::D3D12);
 #else
     leiasr_supported = false;
 #endif
+    // Logged because "why is LeiaSR greyed out" is otherwise unanswerable from
+    // the UI: the API is chosen automatically and never shown to the user.
+    printf("RT64: graphics API %s, LeiaSR %s\n",
+        (app->chosenGraphicsAPI == RT64::UserConfiguration::GraphicsAPI::D3D12) ? "D3D12" :
+        (app->chosenGraphicsAPI == RT64::UserConfiguration::GraphicsAPI::Vulkan) ? "Vulkan" :
+        (app->chosenGraphicsAPI == RT64::UserConfiguration::GraphicsAPI::Metal) ? "Metal" : "unknown",
+        leiasr_supported ? "available" : "unavailable (requires D3D12)");
+    fflush(stdout);
 
     // Set the application's fullscreen state.
     app->setFullScreen(cur_config.wm_option == ultramodern::renderer::WindowMode::Fullscreen);

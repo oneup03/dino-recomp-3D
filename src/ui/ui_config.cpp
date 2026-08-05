@@ -1175,6 +1175,16 @@ void recompui::update_supported_options() {
     new_options = ultramodern::renderer::get_graphics_config();
 
     graphics_model_handle.DirtyAllVariables();
+
+    // The stereo model is constructed with the rest of the config menu, which
+    // happens before graphics init — so leiasr_supported was evaluated while the
+    // RT64 application did not yet exist and the chosen graphics API was still
+    // unknown. This callback fires once graphics is up, which is the first point
+    // the answer is real. Without this the LeiaSR option stays greyed out for the
+    // whole session even on D3D12.
+    if (stereo_model_handle) {
+        stereo_model_handle.DirtyAllVariables();
+    }
 }
 
 void recompui::toggle_fullscreen() {
