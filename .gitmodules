@@ -26,3 +26,7 @@
 [submodule "lib/SDL_GameControllerDB"]
 	path = lib/SDL_GameControllerDB
 	url = https://github.com/mdqinc/SDL_GameControllerDB.git
+[submodule "lib/SR-lib"]
+	path = lib/SR-lib
+	url = https://github.com/bo3b/SR-lib.git
+	branch = api_expansion

@@ -40,7 +40,36 @@ add_compile_definitions(HLSL_CPU)
 if (RECOMP_FLATPAK)
     add_compile_definitions(RECOMP_FLATPAK)
 endif()
+
+# LeiaSR SDK — Windows-only, used by rt64's D3D12 path to weave the stereo pair
+# for a Leia autostereoscopic panel. Vendored through the bo3b/SR-lib submodule,
+# whose CMakeLists locates the nested per-architecture SDK tree and exposes
+# srlib_apply_delayload() plus two targets: SRLib::SDK (headers + import libs)
+# and SRLib::SR (that, plus the SR.cpp SRInterface* wrapper).
+# rt64_leiasr_weaver.cpp drives the wrapper, so link SRLib::SR.
+#
+# This must come before add_subdirectory(lib/rt64): SRLIB_FOUND decides whether
+# rt64 is compiled with LEIASR_SUPPORTED at all.
+#
+# The SR Platform service must be installed on the user's machine at runtime for
+# any weaving to happen, but the import libs are safe to link unconditionally —
+# nothing references them until StereoMode::LeiaSR is actually selected, and the
+# renderer falls back to Side-by-Side when the API is not D3D12.
+add_subdirectory(${CMAKE_SOURCE_DIR}/lib/SR-lib ${CMAKE_BINARY_DIR}/SR-lib)
+set(LEIASR_SUPPORTED ${SRLIB_FOUND})
+
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/rt64 ${CMAKE_BINARY_DIR}/rt64)
+
+# LEIASR_SUPPORTED as a compile definition lets the rt64 sources conditionally
+# include the weaver headers without breaking non-Windows builds, or builds where
+# the SR-lib submodule was not checked out.
+#
+# Note: rt64's own CMakeLists uses the plain target_link_libraries signature, so
+# this must too — CMake forbids mixing the keyword and plain forms on one target.
+if (LEIASR_SUPPORTED)
+    target_compile_definitions(rt64 PUBLIC LEIASR_SUPPORTED=1)
+    target_link_libraries(rt64 SRLib::SR)
+endif()
 
 # set(BUILD_SHARED_LIBS_SAVED "${BUILD_SHARED_LIBS}")
 set(BUILD_SHARED_LIBS OFF)
@@ -221,6 +250,23 @@ endif()
 if (MSVC)
     # Disable identical code folding, since this breaks mod function patching as multiple functions can get merged into one.
     target_link_options(DinosaurPlanetRecompiled PRIVATE /OPT:NOICF)
+
+    # The SR DLLs must be delay-loaded. Linked normally, the EXE refuses to start
+    # on any machine without the SR Platform runtime installed — Windows resolves
+    # every import up front and fails with "entry point not found" referencing
+    # CreateDX12Weaver, before main() runs, for users who will never touch the
+    # LeiaSR mode. With delay-load they are resolved on first call instead, and
+    # SR-lib probes both the core runtime and the DirectX weaver DLL with
+    # LoadLibraryW before any SDK call, so the delay-load helper's SEH path is
+    # never reached on a machine that lacks them.
+    #
+    # The DLL list lives in lib/SR-lib/CMakeLists.txt so it stays correct for
+    # every consumer as the SDK changes. Verify with
+    # `dumpbin /imports DinosaurPlanetRecompiled.exe` — every SR/OpenCV DLL must
+    # appear ONLY under "delay load imports", never in the top-level imports.
+    if (LEIASR_SUPPORTED)
+        srlib_apply_delayload(DinosaurPlanetRecompiled)
+    endif()
 endif()
 
 if (WIN32)
