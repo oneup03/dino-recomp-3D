@@ -391,6 +391,10 @@ RECOMP_PATCH void trackDraw(Gfx** gdl, Mtx** mtxs, Vertex** vtxs, Triangle** pol
     }
     if (gTrackFlags & TRACKFLAG_SKY) {
         camSetupRSPMatrices(&gMainDL, &gWorldRSPMatrices);
+        // @recomp: Sky, sun, moon and stars are at infinity by definition, so tag
+        // this whole block as skybox for stereo 3D. Restored below, before the
+        // world draws that follow.
+        recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_TRANSFORM_ID);
         gDLL_7_Newday->vtbl->func13(&gMainDL, &gWorldRSPMatrices);
 
         if (gTrackFlags & TRACKFLAG_SKY_OBJECTS) {
@@ -415,6 +419,8 @@ RECOMP_PATCH void trackDraw(Gfx** gdl, Mtx** mtxs, Vertex** vtxs, Triangle** pol
         } else {
             gEXMatrixGroupSimpleNormalAuto(gMainDL++, G_EX_ID_AUTO, G_EX_NOPUSH, G_MTX_MODELVIEW, G_EX_EDIT_NONE);
         }
+        // @recomp: End of the sky block — back to world depth.
+        recomp_restore_camera_projection(&gMainDL);
     } else {
         camSetupRSPMatrices(&gMainDL, &gWorldRSPMatrices);
     }
@@ -494,7 +500,11 @@ RECOMP_PATCH void trackDrawMain(void) {
     gRenderListLength = 1;
     gBlocksToDrawIdx = 0;
     diRcpTrace(gMainDL, 0, "track/track.c", 1341);
+    // @recomp: The other Newclouds draw entry point, tagged as skybox for the
+    // same reason as func4 in the caller — see the note there.
+    recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_TRANSFORM_ID);
     gDLL_9_Newclouds->vtbl->func6(&gMainDL, gUpdateRate, 0);
+    recomp_restore_camera_projection(&gMainDL);
     // @recomp: Tag projgfx matrices
     if (recomp_skipAllInterp) {
         gEXMatrixGroupSkipAll(gMainDL++, PROJGFX_MTX_GROUP_ID, G_EX_NOPUSH, G_MTX_MODELVIEW, G_EX_EDIT_NONE);
