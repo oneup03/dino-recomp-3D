@@ -72,6 +72,56 @@ void recomp_skip_camera_interp(void) {
     recomp_skipCameraInterp = TRUE;
 }
 
+// @recomp: Re-submit the camera's projection under a different matrix group.
+//
+// This exists so part of the frame can be classified differently from the rest
+// without moving anything: the matrices submitted are the camera's own, cached
+// by camSetupRSPMatrices, so the image is identical. Only the tag RT64 sees
+// changes. Stereo 3D uses it to mark the cloud layer as skybox, which puts it at
+// infinity instead of at the distance its camera-relative geometry implies.
+//
+// The matrices have to be re-issued rather than just the group: RT64 only starts
+// a new projection entry when the projection matrix or viewport changes, so a
+// bare gEXMatrixGroup would create the group and leave it unreferenced while the
+// draws carried on using the previous projection's tag. This does mean one extra
+// projection submission per frame, which is what the TRACKFLAG_SKY path in map.c
+// already does.
+void recomp_retag_camera_projection(Gfx **gdl, s32 matrixGroupId) {
+    // camSetupRSPMatrices returns early when the camera is out of range, leaving
+    // these unset. Nothing to re-submit in that case.
+    if (recomp_lastCamProjMtx == NULL || recomp_lastCamViewMtx == NULL) {
+        return;
+    }
+
+    // Projection and view separately, matching camSetupRSPMatrices — see the
+    // precision note there.
+    gSPMatrix((*gdl)++, OS_K0_TO_PHYSICAL(recomp_lastCamProjMtx), G_MTX_PROJECTION | G_MTX_LOAD);
+    gSPMatrix((*gdl)++, OS_K0_TO_PHYSICAL(recomp_lastCamViewMtx), G_MTX_PROJECTION | G_MTX_MUL);
+
+    if (recomp_skipCameraInterp || recomp_skipAllInterp) {
+        gEXMatrixGroupSkipAll((*gdl)++, matrixGroupId, G_EX_NOPUSH, G_MTX_PROJECTION, G_EX_EDIT_NONE);
+    } else {
+        gEXMatrixGroupSimpleNormal((*gdl)++, matrixGroupId, G_EX_NOPUSH, G_MTX_PROJECTION, G_EX_EDIT_NONE);
+    }
+}
+
+// @recomp: Put the projection back under the camera's own group.
+//
+// Recomputes the id the way camSetupRSPMatrices does rather than reading a value
+// it saved, to avoid editing that function — it is hot and widely hooked, and
+// changing its body shifts the compiled layout the mod loader relinks against.
+// gCameraSelector is back to its original value by the time this runs, since
+// camSetupRSPMatrices restores it before returning.
+void recomp_restore_camera_projection(Gfx **gdl) {
+    s32 cameraSel = gCameraSelector;
+
+    if (gUseAlternateCamera) {
+        cameraSel += 4;
+    }
+
+    recomp_retag_camera_projection(gdl, CAMERA_MTX_GROUP_ID_START + cameraSel);
+}
+
 RECOMP_PATCH void camSetupRSPMatrices(Gfx **gdl, Mtx **rspMtxs) {
     s32 prevCameraSel;
     f32 x,y,z;

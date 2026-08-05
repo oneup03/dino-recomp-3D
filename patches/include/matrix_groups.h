@@ -23,6 +23,15 @@
 // Waterfx movement ripples: 0x00009050 - 0x0000906F
 #define WATERFX_MOV_RIPPLE_MTX_GROUP_ID_START 0x00009050
 
+// Projection matrix groups for stereoscopic 3D classification. The camera's own
+// projection (CAMERA_MTX_GROUP_ID_START above) already marks world geometry, so
+// this only needs to name the exception: draws that should sit at infinity
+// rather than at the distance their geometry is actually modelled at.
+//
+// Kept at the same numeric value the Banjo and Goemon 3D ports use, so the three
+// stay comparable. Sits outside every range allocated above.
+#define PROJECTION_SKYBOX_TRANSFORM_ID 0x00001001
+
 // Single groups for graphics DLLs (eventually should be more granular per DLL)
 #define NEWDAY_MTX_GROUP_ID 0x0000F000
 #define NEWSTARS_MTX_GROUP_ID 0x0000F001
@@ -69,3 +78,9 @@ RecompObjInterpState* recomp_obj_get_interp_state(Object *obj);
 void recomp_obj_skip_interp(Object *obj);
 void recomp_skip_camera_interp(void);
 void recomp_skip_all_interp(void);
+
+// Re-submit the camera's projection under a different matrix group, so a subset
+// of the frame's draws can be classified differently from the rest without
+// changing what they look like in mono. Paired with recomp_restore_camera_projection.
+void recomp_retag_camera_projection(Gfx **gdl, s32 matrixGroupId);
+void recomp_restore_camera_projection(Gfx **gdl);

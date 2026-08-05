@@ -431,6 +431,15 @@ RECOMP_PATCH void trackDraw(Gfx** gdl, Mtx** mtxs, Vertex** vtxs, Triangle** pol
     D_800B51E4 = camGet();
     blockColorTableTick();
     trackDrawMain();
+    // @recomp: Draw the cloud layer under a skybox-tagged projection.
+    //
+    // The clouds are modelled close to the camera and sell their distance
+    // through motion parallax, which reads fine in mono but puts them at that
+    // near distance once there is real stereo depth. Tagging the projection lets
+    // RT64 give them the skybox treatment — the per-eye off-axis shear without
+    // the lateral view shift — which places them at infinity. No effect in mono:
+    // the matrices submitted are the camera's own.
+    recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_TRANSFORM_ID);
     // @recomp: Tag newclouds matrices
     if (recomp_skipCameraInterp || recomp_skipAllInterp) {
         gEXMatrixGroupSkipAll(gMainDL++, NEWCLOUDS_MTX_GROUP_ID, G_EX_NOPUSH, G_MTX_MODELVIEW, G_EX_EDIT_NONE);
@@ -444,6 +453,8 @@ RECOMP_PATCH void trackDraw(Gfx** gdl, Mtx** mtxs, Vertex** vtxs, Triangle** pol
     } else {
         gEXMatrixGroupSimpleNormalAuto(gMainDL++, G_EX_ID_AUTO, G_EX_NOPUSH, G_MTX_MODELVIEW, G_EX_EDIT_NONE);
     }
+    // @recomp: Anything drawn after this is world geometry again.
+    recomp_restore_camera_projection(&gMainDL);
     camSetupFullscreenViewport(&gMainDL);
     *gdl = gMainDL;
     *mtxs = gWorldRSPMatrices;
