@@ -427,6 +427,11 @@ RECOMP_PATCH void trackDraw(Gfx** gdl, Mtx** mtxs, Vertex** vtxs, Triangle** pol
     gDLL_11_Newlfx->vtbl->func2();
     gDLL_57->vtbl->func3();
     gDLL_58->vtbl->func2();
+    // @recomp: DLL 8 is undecompiled and unnamed, but it sits in the sky family
+    // (7 newday, 8 ?, 9 newclouds, 10 newstars), emits geometry every frame right
+    // after the sky block and before any world drawing, and is the remaining
+    // candidate for the fog/haze layer. Tagged as skybox on that basis.
+    recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_TRANSFORM_ID);
     if (gTrackFlags & TRACKFLAG_SUN_GLARE) {
         if (gDLL_7_Newday->vtbl->func23(&gMainDL) == 0) {
             gDLL_8->vtbl->func3(&gMainDL);
@@ -434,6 +439,7 @@ RECOMP_PATCH void trackDraw(Gfx** gdl, Mtx** mtxs, Vertex** vtxs, Triangle** pol
     } else {
         gDLL_8->vtbl->func3(&gMainDL);
     }
+    recomp_restore_camera_projection(&gMainDL);
     D_800B51E4 = camGet();
     blockColorTableTick();
     trackDrawMain();
@@ -513,6 +519,10 @@ RECOMP_PATCH void trackDrawMain(void) {
     }
     gDLL_15_Projgfx->vtbl->func5(&gMainDL, &gWorldRSPMatrices, &D_800B51D4, 3);
     if (gTrackFlags & TRACKFLAG_SKY) {
+        // @recomp: Minic is undecompiled too, but it only draws under the sky
+        // flag, so treat it as sky as well. The other remaining candidate for the
+        // fog layer alongside DLL 8 above.
+        recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_TRANSFORM_ID);
         // @recomp: Tag minic matrices
         if (recomp_skipCameraInterp || recomp_skipAllInterp) {
             gEXMatrixGroupSkipAll(gMainDL++, MINIC_MTX_GROUP_ID, G_EX_NOPUSH, G_MTX_MODELVIEW, G_EX_EDIT_NONE);
@@ -520,6 +530,7 @@ RECOMP_PATCH void trackDrawMain(void) {
             gEXMatrixGroupSimpleNormalAuto(gMainDL++, MINIC_MTX_GROUP_ID, G_EX_NOPUSH, G_MTX_MODELVIEW, G_EX_EDIT_NONE);
         }
         gDLL_12_Minic->vtbl->func3(&gMainDL, &gWorldRSPMatrices);
+        recomp_restore_camera_projection(&gMainDL);
     }
     // @recomp: Reset matrix tagging
     if (recomp_skipAllInterp) {
