@@ -214,7 +214,7 @@
                                 data-event-blur="set_cur_config_index(-1)"
                                 data-event-focus="set_cur_config_index(5)"
                                 name="antialiasing"
-                                data-attrif-disabled="!msaa2x_supported"
+                                data-attrif-disabled="!msaa2x_supported || stereo_active"
                                 data-checked="msaa_option"
                                 value="MSAA2X"
                                 id="msaa_2x"
@@ -226,7 +226,7 @@
                                 data-event-blur="set_cur_config_index(-1)"
                                 data-event-focus="set_cur_config_index(5)"
                                 name="antialiasing"
-                                data-attrif-disabled="!msaa4x_supported"
+                                data-attrif-disabled="!msaa4x_supported || stereo_active"
                                 data-checked="msaa_option"
                                 value="MSAA4X"
                                 id="msaa_4x"
@@ -234,6 +234,7 @@
                             />
                             <label class="config-option__tab-label" for="msaa_4x">4x</label>
                             <div class="config-option__details" data-if="!sample_positions_supported">Not available (missing sample positions support)</div>
+                            <div class="config-option__details" data-if="stereo_active">Not available while Stereoscopic 3D is enabled</div>
                         </div>
                     </div>
 

@@ -63,6 +63,7 @@ namespace recompui {
         General,
         Controls,
         Graphics,
+        Stereo,
         Sound,
         Mods,
         Debug,

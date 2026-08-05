@@ -2,6 +2,8 @@
 #include "hle/rt64_application.h"
 #include "renderer.hpp"
 
+#include <algorithm>
+#include <atomic>
 #include <memory>
 #include <variant>
 
@@ -16,6 +18,73 @@
 static RT64::UserConfiguration::Antialiasing device_max_msaa = RT64::UserConfiguration::Antialiasing::None;
 static bool sample_positions_supported = false;
 static bool high_precision_fb_enabled = false;
+static bool leiasr_supported = false;
+
+// Stereo settings pushed by set_stereo_config() and consumed by RT64Context
+// before the RT64 application advances a frame. The UI thread and the render
+// thread run on different cadences, so these are packed into a single
+// atomic<uint64_t> to make all four values land coherently without a mutex.
+//   bits [15:0]  separation slider (0..100)
+//   bits [31:16] convergence slider (1..100)
+//   bits [47:32] mode (StereoMode enum value)
+//   bits [63:48] HUD depth slider (0..100)
+static std::atomic<uint64_t> stereo_config_packed{0};
+
+// UINT64_MAX rather than 0 so the first push always applies: 0 is a legitimate
+// packed value (mode Off, every slider at 0).
+static std::atomic<uint64_t> stereo_config_last_applied{UINT64_MAX};
+
+static uint64_t pack_stereo_config(RT64::UserConfiguration::StereoMode mode, uint32_t separation, uint32_t convergence, uint32_t hud_depth) {
+    return (static_cast<uint64_t>(hud_depth & 0xFFFFu) << 48) |
+           (static_cast<uint64_t>(static_cast<uint32_t>(mode) & 0xFFFFu) << 32) |
+           (static_cast<uint64_t>(convergence & 0xFFFFu) << 16) |
+           (static_cast<uint64_t>(separation & 0xFFFFu));
+}
+
+static void apply_pending_stereo_config(RT64::Application* application) {
+    if (application == nullptr) {
+        return;
+    }
+
+    const uint64_t packed = stereo_config_packed.load(std::memory_order_relaxed);
+    if (packed == stereo_config_last_applied.load(std::memory_order_relaxed)) {
+        return;
+    }
+
+    auto mode = static_cast<RT64::UserConfiguration::StereoMode>((packed >> 32) & 0xFFFFu);
+
+    // The LeiaSR weaver is D3D12-only. Applying the fallback here rather than at
+    // the config layer means it is resolved against the API RT64 actually chose,
+    // and the user's saved preference is left untouched — so moving back to D3D12
+    // restores LeiaSR without them having to re-pick it.
+    if ((mode == RT64::UserConfiguration::StereoMode::LeiaSR) && !leiasr_supported) {
+        mode = RT64::UserConfiguration::StereoMode::SideBySide;
+    }
+
+    application->userConfig.stereoSeparation = static_cast<uint32_t>(packed & 0xFFFFu);
+    application->userConfig.stereoConvergence = static_cast<uint32_t>((packed >> 16) & 0xFFFFu);
+    application->userConfig.stereoMode = mode;
+    application->userConfig.stereoHudDepth = static_cast<uint32_t>((packed >> 48) & 0xFFFFu);
+
+    // Propagate into sharedQueueResources->userConfig so the workload and present
+    // threads both see the new values. discardFBs=false: stereo changes neither
+    // render target resolution nor framebuffer layout, so there is nothing to
+    // throw away and doing so would stutter on every slider tick.
+    application->updateUserConfig(false);
+    stereo_config_last_applied.store(packed, std::memory_order_relaxed);
+}
+
+void dino::renderer::set_stereo_config(RT64::UserConfiguration::StereoMode mode, uint32_t separation, uint32_t convergence, uint32_t hud_depth) {
+    separation = std::clamp<uint32_t>(separation, 0, 100);
+    // Convergence floors at 1: the off-axis shear divides by it.
+    convergence = std::clamp<uint32_t>(convergence, 1, 100);
+    hud_depth = std::clamp<uint32_t>(hud_depth, 0, 100);
+    stereo_config_packed.store(pack_stereo_config(mode, separation, convergence, hud_depth), std::memory_order_relaxed);
+}
+
+bool dino::renderer::RT64LeiaSRSupported() {
+    return leiasr_supported;
+}
 
 static uint8_t DMEM[0x1000];
 static uint8_t IMEM[0x1000];
@@ -302,6 +371,15 @@ RT64Context::RT64Context(uint8_t* rdram, ultramodern::renderer::WindowHandle win
         return;
     }
 
+    // The LeiaSR weaver is only implemented against D3D12, and RT64 may have
+    // picked a different API than the user asked for (Automatic, or a fallback),
+    // so this has to be read back from the app rather than from cur_config.
+#if defined(LEIASR_SUPPORTED)
+    leiasr_supported = (app->chosenGraphicsAPI == RT64::UserConfiguration::GraphicsAPI::D3D12);
+#else
+    leiasr_supported = false;
+#endif
+
     // Set the application's fullscreen state.
     app->setFullScreen(cur_config.wm_option == ultramodern::renderer::WindowMode::Fullscreen);
 
@@ -326,6 +404,9 @@ RT64Context::~RT64Context() = default;
 
 void RT64Context::send_dl(const OSTask* task) {
     check_texture_pack_actions();
+    // Must run before the application advances the frame, so the workload and
+    // present threads see a consistent stereo config for the whole frame.
+    apply_pending_stereo_config(app.get());
     app->state->rsp->reset();
     app->interpreter->loadUCodeGBI(task->t.ucode & 0x3FFFFFF, task->t.ucode_data & 0x3FFFFFF, true);
     app->processDisplayLists(app->core.RDRAM, task->t.data_ptr & 0x3FFFFFF, 0, true);

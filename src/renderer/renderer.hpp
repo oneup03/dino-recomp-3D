@@ -44,6 +44,15 @@ namespace dino::renderer {
     bool RT64SamplePositionsSupported();
     bool RT64HighPrecisionFBEnabled();
 
+    // Stereoscopic 3D settings. Thread-safe: the UI thread calls this whenever a
+    // slider moves, and the value is picked up by the render thread at the top of
+    // the next frame. Sliders are clamped here, so callers may pass raw UI values.
+    void set_stereo_config(RT64::UserConfiguration::StereoMode mode, uint32_t separation, uint32_t convergence, uint32_t hud_depth);
+
+    // True when the current graphics API can drive a LeiaSR panel (D3D12 only).
+    // The config UI greys the LeiaSR mode out when this is false.
+    bool RT64LeiaSRSupported();
+
     void trigger_texture_pack_update();
     void enable_texture_pack(const recomp::mods::ModContext& context, const recomp::mods::ModHandle& mod);
     void disable_texture_pack(const recomp::mods::ModHandle& mod);

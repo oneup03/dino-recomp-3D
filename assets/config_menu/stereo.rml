@@ -1,0 +1,192 @@
+<template name="config-menu__stereo">
+    <head>
+    </head>
+    <body>
+        <form class="config__form config-stereo">
+            <div class="config__hz-wrapper" style="tab-index: auto; nav: auto">
+                <div class="config__wrapper" data-event-mouseout="set_cur_config_index(-1)">
+                    <!-- Output mode -->
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(0)">
+                        <label class="config-option__title">Stereoscopic 3D</label>
+                        <div class="config-option__list">
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(0)"
+                                name="stereo_mode"
+                                data-checked="stereo_mode"
+                                value="0"
+                                id="stereo_off"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                            />
+                            <label class="config-option__tab-label" for="stereo_off">Off</label>
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(0)"
+                                name="stereo_mode"
+                                data-checked="stereo_mode"
+                                value="1"
+                                id="stereo_sbs"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                            />
+                            <label class="config-option__tab-label" for="stereo_sbs">Side by Side</label>
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(0)"
+                                name="stereo_mode"
+                                data-checked="stereo_mode"
+                                value="2"
+                                id="stereo_tab"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                            />
+                            <label class="config-option__tab-label" for="stereo_tab">Top and Bottom</label>
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(0)"
+                                name="stereo_mode"
+                                data-checked="stereo_mode"
+                                value="3"
+                                id="stereo_row"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                            />
+                            <label class="config-option__tab-label" for="stereo_row">Row Interlaced</label>
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(0)"
+                                name="stereo_mode"
+                                data-checked="stereo_mode"
+                                value="4"
+                                id="stereo_col"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                            />
+                            <label class="config-option__tab-label" for="stereo_col">Column Interlaced</label>
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(0)"
+                                name="stereo_mode"
+                                data-checked="stereo_mode"
+                                value="5"
+                                id="stereo_checker"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                            />
+                            <label class="config-option__tab-label" for="stereo_checker">Checkerboard</label>
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(0)"
+                                name="stereo_mode"
+                                data-checked="stereo_mode"
+                                value="6"
+                                id="stereo_anaglyph"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                            />
+                            <label class="config-option__tab-label" for="stereo_anaglyph">Anaglyph</label>
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(0)"
+                                name="stereo_mode"
+                                data-attrif-disabled="!leiasr_supported"
+                                data-checked="stereo_mode"
+                                value="7"
+                                id="stereo_leiasr"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                            />
+                            <label class="config-option__tab-label" for="stereo_leiasr">LeiaSR</label>
+                        </div>
+                    </div>
+
+                    <!-- Separation -->
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(1)">
+                        <label class="config-option__title">3D Separation</label>
+                        <div class="config-option__list">
+                            <input
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(1)"
+                                id="stereo_separation_slider"
+                                type="range"
+                                min="0"
+                                max="100"
+                                data-attrif-disabled="stereo_mode == '0'"
+                                style="flex:1;margin: 0dp;nav-up:#stereo_off;nav-down:#stereo_convergence_slider;"
+                                data-value="stereo_separation"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Convergence -->
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(2)">
+                        <label class="config-option__title">3D Convergence</label>
+                        <div class="config-option__list">
+                            <input
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(2)"
+                                id="stereo_convergence_slider"
+                                type="range"
+                                min="1"
+                                max="100"
+                                data-attrif-disabled="stereo_mode == '0'"
+                                style="flex:1;margin: 0dp;nav-up:#stereo_separation_slider;nav-down:#stereo_hud_depth_slider;"
+                                data-value="stereo_convergence"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- HUD depth -->
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(3)">
+                        <label class="config-option__title">HUD Depth</label>
+                        <div class="config-option__list">
+                            <input
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(3)"
+                                id="stereo_hud_depth_slider"
+                                type="range"
+                                min="0"
+                                max="100"
+                                data-attrif-disabled="stereo_mode == '0'"
+                                style="flex:1;margin: 0dp;nav-up:#stereo_convergence_slider;nav-down:#stereo_off;"
+                                data-value="stereo_hud_depth"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config__wrapper_scroll">
+                    <p data-if="cur_config_index == -1">
+                        Renders the game in stereoscopic 3D by drawing the scene twice, once per eye.
+                        <br />
+                        <br />
+                        These settings apply immediately, so you can leave the menu open and adjust them while looking at the game behind it.
+                    </p>
+                    <p data-if="cur_config_index == 0">
+                        Selects how the two eye images are packed into the final picture. Pick the one your display or glasses expect.
+                        <br />
+                        <br />
+                        <b>Side by Side</b> and <b>Top and Bottom</b> suit most 3D TVs, headsets and AR glasses. <b>Row</b>/<b>Column Interlaced</b> and <b>Checkerboard</b> suit passive-polarised displays. <b>Anaglyph</b> uses ordinary red/cyan glasses on any screen. <b>LeiaSR</b> drives a Leia autostereoscopic panel and needs no glasses.
+                        <br />
+                        <br />
+                        <b>Note: MS Anti-Aliasing must be off. Stereo renders the second eye into a separate target, which is not compatible with MSAA — the graphics tab disables MSAA while 3D is on.</b>
+                        <br />
+                        <br />
+                        <b>Note: LeiaSR requires the Direct3D 12 graphics API and the Leia SR Platform runtime. It is unavailable otherwise.</b>
+                    </p>
+                    <p data-if="cur_config_index == 1">
+                        Sets the distance between the two virtual eyes, which controls how strong the 3D effect is.
+                        <br />
+                        <br />
+                        Higher values give more depth but are more tiring to look at, and can be uncomfortable when something passes close to the camera. If the image is hard to fuse into one picture, lower this first.
+                    </p>
+                    <p data-if="cur_config_index == 2">
+                        Sets the distance at which objects sit exactly on the screen plane.
+                        <br />
+                        <br />
+                        Anything nearer than this appears to come out of the screen, anything further sits behind it. Lower values push more of the scene out towards you.
+                    </p>
+                    <p data-if="cur_config_index == 3">
+                        Sets the depth the HUD sits at, independently of the world.
+                        <br />
+                        <br />
+                        <b>50</b> places it flat on the screen. Lower values push it behind the screen, higher values bring it forward. If the HUD is hard to read, or nearby scenery appears to cut through it, adjust this.
+                    </p>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

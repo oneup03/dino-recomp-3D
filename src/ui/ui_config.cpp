@@ -18,6 +18,7 @@ Rml::DataModelHandle nav_help_model_handle;
 Rml::DataModelHandle general_model_handle;
 Rml::DataModelHandle controls_model_handle;
 Rml::DataModelHandle graphics_model_handle;
+Rml::DataModelHandle stereo_model_handle;
 Rml::DataModelHandle sound_options_model_handle;
 
 // True if controller config menu is open, false if keyboard config menu is open, undefined otherwise
@@ -31,12 +32,14 @@ int recompui::config_tab_to_index(recompui::ConfigTab tab) {
         return 1;
     case recompui::ConfigTab::Graphics:
         return 2;
-    case recompui::ConfigTab::Sound:
+    case recompui::ConfigTab::Stereo:
         return 3;
-    case recompui::ConfigTab::Mods:
+    case recompui::ConfigTab::Sound:
         return 4;
-    case recompui::ConfigTab::Debug:
+    case recompui::ConfigTab::Mods:
         return 5;
+    case recompui::ConfigTab::Debug:
+        return 6;
     default:
         assert(false && "Unknown config tab.");
         return 0;
@@ -386,6 +389,63 @@ void dino::config::set_hud_mode(dino::config::HUDMode mode) {
 	}
 }
 
+// Stereoscopic 3D. Unlike the graphics options there is no Apply button here:
+// every change is pushed straight to the renderer, so dragging a separation or
+// convergence slider is visible in the world behind the menu as you drag it.
+// That live feedback is the whole point — these values are calibrated by eye.
+static dino::config::StereoSettings stereo_settings_context;
+
+// Explicit rather than a cast: the two enums are declared independently, and a
+// silent reordering of either would otherwise swap output modes at runtime with
+// nothing to catch it. Matches the to_rt64 mappers in renderer.cpp.
+static RT64::UserConfiguration::StereoMode to_rt64(dino::config::StereoMode mode) {
+    switch (mode) {
+        default:
+        case dino::config::StereoMode::Off:
+            return RT64::UserConfiguration::StereoMode::Off;
+        case dino::config::StereoMode::SideBySide:
+            return RT64::UserConfiguration::StereoMode::SideBySide;
+        case dino::config::StereoMode::TopAndBottom:
+            return RT64::UserConfiguration::StereoMode::TopAndBottom;
+        case dino::config::StereoMode::RowInterlaced:
+            return RT64::UserConfiguration::StereoMode::RowInterlaced;
+        case dino::config::StereoMode::ColumnInterlaced:
+            return RT64::UserConfiguration::StereoMode::ColumnInterlaced;
+        case dino::config::StereoMode::Checkerboard:
+            return RT64::UserConfiguration::StereoMode::Checkerboard;
+        case dino::config::StereoMode::Anaglyph:
+            return RT64::UserConfiguration::StereoMode::Anaglyph;
+        case dino::config::StereoMode::LeiaSR:
+            return RT64::UserConfiguration::StereoMode::LeiaSR;
+    }
+}
+
+dino::config::StereoSettings dino::config::get_stereo_settings() {
+    return stereo_settings_context;
+}
+
+void dino::config::set_stereo_settings(const dino::config::StereoSettings& settings) {
+    stereo_settings_context = settings;
+
+    // Note the LeiaSR-needs-D3D12 fallback deliberately is NOT applied here.
+    // This runs during config load, before the RT64 application exists and
+    // therefore before the chosen graphics API is known — downgrading here would
+    // push Side-by-Side on every boot and never recover. renderer.cpp applies it
+    // instead, where the API is known and it is re-evaluated on every push.
+    dino::renderer::set_stereo_config(
+        to_rt64(settings.mode),
+        static_cast<uint32_t>(settings.separation),
+        static_cast<uint32_t>(settings.convergence),
+        static_cast<uint32_t>(settings.hud_depth));
+
+    if (stereo_model_handle) {
+        stereo_model_handle.DirtyVariable("stereo_mode");
+        stereo_model_handle.DirtyVariable("stereo_separation");
+        stereo_model_handle.DirtyVariable("stereo_convergence");
+        stereo_model_handle.DirtyVariable("stereo_hud_depth");
+    }
+}
+
 dino::config::MinimapMode dino::config::get_minimap_mode() {
 	return control_options_context.minimap_mode;
 }
@@ -711,7 +771,75 @@ public:
         constructor.Bind("msaa8x_supported", &msaa8x_supported);
         constructor.Bind("sample_positions_supported", &sample_positions_supported);
 
+        // MSAA and stereo are mutually exclusive: RT64 redirects the right-eye
+        // pass to an override render target, and that redirection is itself
+        // MSAA-gated, so with both on the right eye simply never renders. The
+        // MSAA radio buttons key their disabled state off this.
+        constructor.BindFunc("stereo_active",
+            [](Rml::Variant& out) {
+                out = (dino::config::get_stereo_settings().mode != dino::config::StereoMode::Off);
+            });
+
         graphics_model_handle = constructor.GetModelHandle();
+    }
+
+    void make_stereo_bindings(Rml::Context* context) {
+        Rml::DataModelConstructor constructor = context->CreateDataModel("stereo_model");
+        if (!constructor) {
+            throw std::runtime_error("Failed to make RmlUi data model for the stereo config menu");
+        }
+
+        bind_config_list_events(constructor);
+
+        // The mode binds as a plain integer string matching the RML radio values,
+        // rather than through the get_option/set_option JSON-name path the other
+        // enums use. The human-readable names live in the RML labels.
+        constructor.BindFunc("stereo_mode",
+            [](Rml::Variant& out) {
+                out = std::to_string(static_cast<int>(dino::config::get_stereo_settings().mode));
+            },
+            [](const Rml::Variant& in) {
+                dino::config::StereoSettings settings = dino::config::get_stereo_settings();
+                const int value = std::atoi(in.Get<Rml::String>().c_str());
+                if ((value >= 0) && (value < static_cast<int>(dino::config::StereoMode::OptionCount))) {
+                    settings.mode = static_cast<dino::config::StereoMode>(value);
+                    dino::config::set_stereo_settings(settings);
+                    // The MSAA options in the graphics tab grey out while stereo
+                    // is on, so that model needs to re-evaluate too.
+                    if (graphics_model_handle) {
+                        graphics_model_handle.DirtyVariable("stereo_active");
+                    }
+                }
+            });
+
+        constructor.BindFunc("stereo_separation",
+            [](Rml::Variant& out) { out = dino::config::get_stereo_settings().separation; },
+            [](const Rml::Variant& in) {
+                dino::config::StereoSettings settings = dino::config::get_stereo_settings();
+                settings.separation = in.Get<int>();
+                dino::config::set_stereo_settings(settings);
+            });
+
+        constructor.BindFunc("stereo_convergence",
+            [](Rml::Variant& out) { out = dino::config::get_stereo_settings().convergence; },
+            [](const Rml::Variant& in) {
+                dino::config::StereoSettings settings = dino::config::get_stereo_settings();
+                settings.convergence = in.Get<int>();
+                dino::config::set_stereo_settings(settings);
+            });
+
+        constructor.BindFunc("stereo_hud_depth",
+            [](Rml::Variant& out) { out = dino::config::get_stereo_settings().hud_depth; },
+            [](const Rml::Variant& in) {
+                dino::config::StereoSettings settings = dino::config::get_stereo_settings();
+                settings.hud_depth = in.Get<int>();
+                dino::config::set_stereo_settings(settings);
+            });
+
+        constructor.BindFunc("leiasr_supported",
+            [](Rml::Variant& out) { out = dino::renderer::RT64LeiaSRSupported(); });
+
+        stereo_model_handle = constructor.GetModelHandle();
     }
 
     void make_controls_bindings(Rml::Context* context) {
@@ -984,6 +1112,7 @@ public:
         make_general_bindings(context);
         make_controls_bindings(context);
         make_graphics_bindings(context);
+        make_stereo_bindings(context);
         make_sound_options_bindings(context);
         make_debug_bindings(context);
     }

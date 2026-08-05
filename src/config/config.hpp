@@ -102,6 +102,49 @@ namespace dino::config {
         {dino::config::MinimapMode::Hidden, "Hidden"}
     });
 
+    // Stereoscopic 3D. Kept in its own struct rather than added to
+    // ultramodern::renderer::GraphicsConfig, because that type lives in the
+    // N64ModernRuntime submodule and extending it would mean forking a second
+    // submodule for a Dino-only feature.
+    enum class StereoMode {
+        Off,
+        SideBySide,
+        TopAndBottom,
+        RowInterlaced,
+        ColumnInterlaced,
+        Checkerboard,
+        Anaglyph,
+        LeiaSR,
+        OptionCount
+    };
+
+    NLOHMANN_JSON_SERIALIZE_ENUM(dino::config::StereoMode, {
+        {dino::config::StereoMode::Off, "Off"},
+        {dino::config::StereoMode::SideBySide, "SideBySide"},
+        {dino::config::StereoMode::TopAndBottom, "TopAndBottom"},
+        {dino::config::StereoMode::RowInterlaced, "RowInterlaced"},
+        {dino::config::StereoMode::ColumnInterlaced, "ColumnInterlaced"},
+        {dino::config::StereoMode::Checkerboard, "Checkerboard"},
+        {dino::config::StereoMode::Anaglyph, "Anaglyph"},
+        {dino::config::StereoMode::LeiaSR, "LeiaSR"}
+    });
+
+    struct StereoSettings {
+        StereoMode mode = StereoMode::Off;
+        // 0..100. See kSeparationWorldScale in rt64_projection_processor.cpp for
+        // how these map onto Dinosaur Planet's world units.
+        int separation = 50;
+        // 1..100. Floors at 1 because the off-axis shear divides by it.
+        int convergence = 20;
+        // 0..100, 50 = screen plane.
+        int hud_depth = 35;
+
+        auto operator<=>(const StereoSettings&) const = default;
+    };
+
+    StereoSettings get_stereo_settings();
+    void set_stereo_settings(const StereoSettings& settings);
+
     AutosaveMode get_autosave_mode();
     void set_autosave_mode(AutosaveMode mode);
 

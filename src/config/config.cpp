@@ -357,11 +357,34 @@ void reset_graphics_options() {
     new_config.rr_manual_value = rr_manual_default;
     new_config.developer_mode = developer_mode_default;
     ultramodern::renderer::set_graphics_config(new_config);
+
+    set_stereo_settings(StereoSettings{});
+}
+
+// Stereo settings live alongside the graphics config rather than in their own
+// file, but in a separate struct: ultramodern::renderer::GraphicsConfig is
+// defined in the N64ModernRuntime submodule, so adding fields to it would mean
+// forking a second submodule for a Dino-only feature.
+void stereo_settings_to_json(nlohmann::json& j, const StereoSettings& settings) {
+    j["stereo_mode"] = settings.mode;
+    j["stereo_separation"] = settings.separation;
+    j["stereo_convergence"] = settings.convergence;
+    j["stereo_hud_depth"] = settings.hud_depth;
+}
+
+void stereo_settings_from_json(const nlohmann::json& j, StereoSettings& settings) {
+    const StereoSettings defaults{};
+    settings.mode = from_or_default(j, "stereo_mode", defaults.mode);
+    settings.separation = std::clamp(from_or_default(j, "stereo_separation", defaults.separation), 0, 100);
+    // Convergence floors at 1: the off-axis shear divides by it.
+    settings.convergence = std::clamp(from_or_default(j, "stereo_convergence", defaults.convergence), 1, 100);
+    settings.hud_depth = std::clamp(from_or_default(j, "stereo_hud_depth", defaults.hud_depth), 0, 100);
 }
 
 bool save_graphics_config(const std::filesystem::path& path) {
     nlohmann::json config_json{};
     graphics_config_to_json(config_json, ultramodern::renderer::get_graphics_config());
+    stereo_settings_to_json(config_json, get_stereo_settings());
     return save_json_with_backups(path, config_json);
 }
 
@@ -374,6 +397,10 @@ bool load_graphics_config(const std::filesystem::path& path) {
     ultramodern::renderer::GraphicsConfig new_config{};
     graphics_config_from_json(config_json, new_config);
     ultramodern::renderer::set_graphics_config(new_config);
+
+    StereoSettings stereo_settings{};
+    stereo_settings_from_json(config_json, stereo_settings);
+    set_stereo_settings(stereo_settings);
     return true;
 }
 
