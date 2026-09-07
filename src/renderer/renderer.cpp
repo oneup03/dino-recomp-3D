@@ -22,17 +22,34 @@ static bool leiasr_supported = false;
 
 // Stereo settings pushed by set_stereo_config() and consumed by RT64Context
 // before the RT64 application advances a frame. The UI thread and the render
-// thread run on different cadences, so these are packed into a single
-// atomic<uint64_t> to make all four values land coherently without a mutex.
-//   bits [15:0]  separation slider (0..100)
-//   bits [31:16] convergence slider (1..100)
-//   bits [47:32] mode (StereoMode enum value)
-//   bits [63:48] HUD depth slider (0..100)
+// thread run on different cadences, so these are packed into atomics to make
+// the values land coherently without a mutex.
+//
+// Two words rather than one because the settings no longer fit in 64 bits.
+// They are read together and compared together below, so a change to either
+// still applies as one coherent update.
+//   packed:  bits [15:0]  separation slider (0..100)
+//            bits [31:16] convergence, in TENTHS of its slider (1..1000)
+//            bits [47:32] mode (StereoMode enum value)
+//            bits [63:48] HUD depth slider (0..100)
 static std::atomic<uint64_t> stereo_config_packed{0};
+
+//   packed2: bits [7:0]   ghost-reduction contrast percent (0..100)
+//            bits [15:8]  ghost-reduction black floor percent (0..100)
+//            bits [16]    auto-convergence enabled
+//            bits [31:24] comfort target, BIASED by +50 so the signed
+//                         -50..60 range packs as an unsigned 0..110
+static std::atomic<uint64_t> stereo_config_packed2{0};
 
 // UINT64_MAX rather than 0 so the first push always applies: 0 is a legitimate
 // packed value (mode Off, every slider at 0).
 static std::atomic<uint64_t> stereo_config_last_applied{UINT64_MAX};
+static std::atomic<uint64_t> stereo_config_last_applied2{UINT64_MAX};
+
+// The comfort target is the one signed setting in the bridge. Biasing it here
+// rather than sign-extending on the way out keeps the unpack symmetric with
+// every other field.
+static constexpr int32_t kComfortTargetBias = 50;
 
 static uint64_t pack_stereo_config(RT64::UserConfiguration::StereoMode mode, uint32_t separation, uint32_t convergence, uint32_t hud_depth) {
     return (static_cast<uint64_t>(hud_depth & 0xFFFFu) << 48) |
@@ -41,13 +58,23 @@ static uint64_t pack_stereo_config(RT64::UserConfiguration::StereoMode mode, uin
            (static_cast<uint64_t>(separation & 0xFFFFu));
 }
 
+static uint64_t pack_stereo_config2(bool auto_convergence, int32_t comfort_target, uint32_t ghost_contrast, uint32_t ghost_black_floor) {
+    const uint32_t biased_comfort = static_cast<uint32_t>(comfort_target + kComfortTargetBias);
+    return (static_cast<uint64_t>(biased_comfort & 0xFFu) << 24) |
+           (static_cast<uint64_t>(auto_convergence ? 1u : 0u) << 16) |
+           (static_cast<uint64_t>(ghost_black_floor & 0xFFu) << 8) |
+           (static_cast<uint64_t>(ghost_contrast & 0xFFu));
+}
+
 static void apply_pending_stereo_config(RT64::Application* application) {
     if (application == nullptr) {
         return;
     }
 
     const uint64_t packed = stereo_config_packed.load(std::memory_order_relaxed);
-    if (packed == stereo_config_last_applied.load(std::memory_order_relaxed)) {
+    const uint64_t packed2 = stereo_config_packed2.load(std::memory_order_relaxed);
+    if ((packed == stereo_config_last_applied.load(std::memory_order_relaxed)) &&
+        (packed2 == stereo_config_last_applied2.load(std::memory_order_relaxed))) {
         return;
     }
 
@@ -65,6 +92,11 @@ static void apply_pending_stereo_config(RT64::Application* application) {
     application->userConfig.stereoConvergence = static_cast<uint32_t>((packed >> 16) & 0xFFFFu);
     application->userConfig.stereoMode = mode;
     application->userConfig.stereoHudDepth = static_cast<uint32_t>((packed >> 48) & 0xFFFFu);
+    application->userConfig.stereoGhostContrast = static_cast<uint32_t>(packed2 & 0xFFu);
+    application->userConfig.stereoGhostBlackFloor = static_cast<uint32_t>((packed2 >> 8) & 0xFFu);
+    application->userConfig.stereoAutoConvergence = static_cast<uint32_t>((packed2 >> 16) & 0x1u);
+    application->userConfig.stereoComfortTarget =
+        static_cast<int32_t>((packed2 >> 24) & 0xFFu) - kComfortTargetBias;
 
     // Propagate into sharedQueueResources->userConfig so the workload and present
     // threads both see the new values. discardFBs=false: stereo changes neither
@@ -72,14 +104,25 @@ static void apply_pending_stereo_config(RT64::Application* application) {
     // throw away and doing so would stutter on every slider tick.
     application->updateUserConfig(false);
     stereo_config_last_applied.store(packed, std::memory_order_relaxed);
+    stereo_config_last_applied2.store(packed2, std::memory_order_relaxed);
 }
 
-void dino::renderer::set_stereo_config(RT64::UserConfiguration::StereoMode mode, uint32_t separation, uint32_t convergence, uint32_t hud_depth) {
+void dino::renderer::set_stereo_config(RT64::UserConfiguration::StereoMode mode, uint32_t separation, uint32_t convergence,
+                                       uint32_t hud_depth, bool auto_convergence, int32_t comfort_target,
+                                       uint32_t ghost_contrast, uint32_t ghost_black_floor) {
     separation = std::clamp<uint32_t>(separation, 0, 100);
-    // Convergence floors at 1: the off-axis shear divides by it.
-    convergence = std::clamp<uint32_t>(convergence, 1, 100);
+    // Convergence arrives in TENTHS of its slider and floors at 1 (0.1), which
+    // is a comfort limit rather than a numerical one: under the clip-space
+    // parameterization the shear is just `separation` and no longer divides by
+    // convergence, so nothing here explodes as it approaches zero.
+    convergence = std::clamp<uint32_t>(convergence, 1, 1000);
     hud_depth = std::clamp<uint32_t>(hud_depth, 0, 100);
+    comfort_target = std::clamp<int32_t>(comfort_target, -50, 60);
+    ghost_contrast = std::clamp<uint32_t>(ghost_contrast, 0, 100);
+    ghost_black_floor = std::clamp<uint32_t>(ghost_black_floor, 0, 100);
     stereo_config_packed.store(pack_stereo_config(mode, separation, convergence, hud_depth), std::memory_order_relaxed);
+    stereo_config_packed2.store(pack_stereo_config2(auto_convergence, comfort_target, ghost_contrast, ghost_black_floor),
+                                std::memory_order_relaxed);
 }
 
 bool dino::renderer::RT64LeiaSRSupported() {

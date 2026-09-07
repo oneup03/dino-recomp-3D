@@ -30,7 +30,19 @@
 //
 // Kept at the same numeric value the Banjo and Goemon 3D ports use, so the three
 // stay comparable. Sits outside every range allocated above.
-#define PROJECTION_SKYBOX_TRANSFORM_ID 0x00001001
+// One id per SOURCE rather than one shared id. Every one of them gets identical
+// treatment -- the renderer matches the whole range -- but the RT64 inspector
+// prints the matrix group, so a distinct id per site is the difference between
+// "this draw is somewhere in the sky family" and "this draw is DLL 8".
+//
+// That matters because two of these blocks are tagged on inference rather than on
+// reading what they render, and the way that error shows up is something which
+// ought to have depth going flat instead.
+#define PROJECTION_SKYBOX_TRANSFORM_ID    0x00001001  // sun / moon / stars block
+#define PROJECTION_SKYBOX_ID_DLL8         0x00001002  // undecompiled DLL 8
+#define PROJECTION_SKYBOX_ID_CLOUDS       0x00001003  // Newclouds func4
+#define PROJECTION_SKYBOX_ID_CLOUDS_LATE  0x00001004  // Newclouds func6
+#define PROJECTION_SKYBOX_ID_MINIC        0x00001005  // undecompiled Minic
 
 // Single groups for graphics DLLs (eventually should be more granular per DLL)
 #define NEWDAY_MTX_GROUP_ID 0x0000F000

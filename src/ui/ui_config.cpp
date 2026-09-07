@@ -435,14 +435,22 @@ void dino::config::set_stereo_settings(const dino::config::StereoSettings& setti
     dino::renderer::set_stereo_config(
         to_rt64(settings.mode),
         static_cast<uint32_t>(settings.separation),
-        static_cast<uint32_t>(settings.convergence),
-        static_cast<uint32_t>(settings.hud_depth));
+        static_cast<uint32_t>(settings.convergence_tenths),
+        static_cast<uint32_t>(settings.hud_depth),
+        settings.auto_convergence,
+        static_cast<int32_t>(settings.comfort_target),
+        static_cast<uint32_t>(settings.ghost_contrast),
+        static_cast<uint32_t>(settings.ghost_black_floor));
 
     if (stereo_model_handle) {
         stereo_model_handle.DirtyVariable("stereo_mode");
         stereo_model_handle.DirtyVariable("stereo_separation");
         stereo_model_handle.DirtyVariable("stereo_convergence");
         stereo_model_handle.DirtyVariable("stereo_hud_depth");
+        stereo_model_handle.DirtyVariable("stereo_auto_convergence");
+        stereo_model_handle.DirtyVariable("stereo_comfort_target");
+        stereo_model_handle.DirtyVariable("stereo_ghost_contrast");
+        stereo_model_handle.DirtyVariable("stereo_ghost_black_floor");
     }
 }
 
@@ -570,6 +578,21 @@ Rml::Element* recompui::get_child_by_tag(Rml::Element* parent, const std::string
     return nullptr;
 }
 
+// The graphics and stereo tabs carry more options than the modal is tall, so their
+// option columns scroll. RmlUi's directional search refuses to descend into a scroll
+// container that isn't focusable itself, so pressing down from the tab strip would
+// find nothing at all in them. Name the option those tabs should open on instead,
+// the way the mod tab does; every other tab keeps the spatial search.
+static const char* config_tab_entry_id(int tab_index) {
+    if (tab_index == recompui::config_tab_to_index(recompui::ConfigTab::Graphics)) {
+        return "#res_original";
+    }
+    if (tab_index == recompui::config_tab_to_index(recompui::ConfigTab::Stereo)) {
+        return "#stereo_off";
+    }
+    return nullptr;
+}
+
 class ConfigTabsetListener : public Rml::EventListener {
     void ProcessEvent(Rml::Event& event) override {
         if (event.GetId() == Rml::EventId::Tabchange) {
@@ -582,9 +605,15 @@ class ConfigTabsetListener : public Rml::EventListener {
                 Rml::ElementTabSet* tabset = recompui::get_config_tabset();
                 Rml::Element* tabs = recompui::get_child_by_tag(tabset, "tabs");
                 if (tabs != nullptr) {
+                    const char* entry_id = config_tab_entry_id(tab_index);
                     size_t num_children = tabs->GetNumChildren();
                     for (size_t i = 0; i < num_children; i++) {
-                        tabs->GetChild(i)->SetProperty(Rml::PropertyId::NavDown, Rml::Style::Nav::Auto);
+                        if (entry_id != nullptr) {
+                            tabs->GetChild(i)->SetProperty(Rml::PropertyId::NavDown, Rml::Property{ Rml::String{entry_id}, Rml::Unit::STRING });
+                        }
+                        else {
+                            tabs->GetChild(i)->SetProperty(Rml::PropertyId::NavDown, Rml::Style::Nav::Auto);
+                        }
                     }
                 }
             }
@@ -820,11 +849,14 @@ public:
                 dino::config::set_stereo_settings(settings);
             });
 
+        // The slider works directly in TENTHS of a convergence unit, so it can
+        // step below 1 without this binding going floating point. The RML sets a
+        // step so the range is still traversable by keyboard.
         constructor.BindFunc("stereo_convergence",
-            [](Rml::Variant& out) { out = dino::config::get_stereo_settings().convergence; },
+            [](Rml::Variant& out) { out = dino::config::get_stereo_settings().convergence_tenths; },
             [](const Rml::Variant& in) {
                 dino::config::StereoSettings settings = dino::config::get_stereo_settings();
-                settings.convergence = in.Get<int>();
+                settings.convergence_tenths = in.Get<int>();
                 dino::config::set_stereo_settings(settings);
             });
 
@@ -833,6 +865,40 @@ public:
             [](const Rml::Variant& in) {
                 dino::config::StereoSettings settings = dino::config::get_stereo_settings();
                 settings.hud_depth = in.Get<int>();
+                dino::config::set_stereo_settings(settings);
+            });
+
+        // Bound as an int rather than a bool so the RML can drive it from the
+        // same radio-button pattern the mode selector uses.
+        constructor.BindFunc("stereo_auto_convergence",
+            [](Rml::Variant& out) { out = dino::config::get_stereo_settings().auto_convergence ? 1 : 0; },
+            [](const Rml::Variant& in) {
+                dino::config::StereoSettings settings = dino::config::get_stereo_settings();
+                settings.auto_convergence = (in.Get<int>() != 0);
+                dino::config::set_stereo_settings(settings);
+            });
+
+        constructor.BindFunc("stereo_comfort_target",
+            [](Rml::Variant& out) { out = dino::config::get_stereo_settings().comfort_target; },
+            [](const Rml::Variant& in) {
+                dino::config::StereoSettings settings = dino::config::get_stereo_settings();
+                settings.comfort_target = in.Get<int>();
+                dino::config::set_stereo_settings(settings);
+            });
+
+        constructor.BindFunc("stereo_ghost_contrast",
+            [](Rml::Variant& out) { out = dino::config::get_stereo_settings().ghost_contrast; },
+            [](const Rml::Variant& in) {
+                dino::config::StereoSettings settings = dino::config::get_stereo_settings();
+                settings.ghost_contrast = in.Get<int>();
+                dino::config::set_stereo_settings(settings);
+            });
+
+        constructor.BindFunc("stereo_ghost_black_floor",
+            [](Rml::Variant& out) { out = dino::config::get_stereo_settings().ghost_black_floor; },
+            [](const Rml::Variant& in) {
+                dino::config::StereoSettings settings = dino::config::get_stereo_settings();
+                settings.ghost_black_floor = in.Get<int>();
                 dino::config::set_stereo_settings(settings);
             });
 

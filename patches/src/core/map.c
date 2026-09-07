@@ -431,7 +431,7 @@ RECOMP_PATCH void trackDraw(Gfx** gdl, Mtx** mtxs, Vertex** vtxs, Triangle** pol
     // (7 newday, 8 ?, 9 newclouds, 10 newstars), emits geometry every frame right
     // after the sky block and before any world drawing, and is the remaining
     // candidate for the fog/haze layer. Tagged as skybox on that basis.
-    recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_TRANSFORM_ID);
+    recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_ID_DLL8);
     if (gTrackFlags & TRACKFLAG_SUN_GLARE) {
         if (gDLL_7_Newday->vtbl->func23(&gMainDL) == 0) {
             gDLL_8->vtbl->func3(&gMainDL);
@@ -443,15 +443,27 @@ RECOMP_PATCH void trackDraw(Gfx** gdl, Mtx** mtxs, Vertex** vtxs, Triangle** pol
     D_800B51E4 = camGet();
     blockColorTableTick();
     trackDrawMain();
-    // @recomp: Draw the cloud layer under a skybox-tagged projection.
+    // @recomp: NOT tagged as skybox, unlike func6 below.
     //
-    // The clouds are modelled close to the camera and sell their distance
-    // through motion parallax, which reads fine in mono but puts them at that
-    // near distance once there is real stereo depth. Tagging the projection lets
-    // RT64 give them the skybox treatment — the per-eye off-axis shear without
-    // the lateral view shift — which places them at infinity. No effect in mono:
-    // the matrices submitted are the camera's own.
-    recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_TRANSFORM_ID);
+    // This entry point was originally tagged for the same reason func6 still is:
+    // the cloud layer is modelled close to the camera and sells its distance
+    // through motion parallax, which reads fine in mono but sits uncomfortably
+    // near once there is real stereo depth.
+    //
+    // The RT64 inspector then showed the falling SNOW coming through here as
+    // well, under this projection, carrying an ordinary world view matrix with a
+    // real camera translation. Snow is weather in the world a few feet from the
+    // player, not sky, and the skybox treatment was pinning it at infinity.
+    //
+    // The stereo classification is per PROJECTION, so anything this call draws
+    // shares one answer and the two cannot be split from out here. Weather having
+    // depth matters more than the cloud layer being pinned, and func6 -- the
+    // second cloud draw -- keeps its tag, so if the visible cloud layer comes
+    // from there it is unaffected.
+    //
+    // If the clouds do come forward as a result, that means func4 draws both and
+    // they genuinely conflict; separating them would need DLL 9 decompiled far
+    // enough to tag from inside it.
     // @recomp: Tag newclouds matrices
     if (recomp_skipCameraInterp || recomp_skipAllInterp) {
         gEXMatrixGroupSkipAll(gMainDL++, NEWCLOUDS_MTX_GROUP_ID, G_EX_NOPUSH, G_MTX_MODELVIEW, G_EX_EDIT_NONE);
@@ -465,8 +477,6 @@ RECOMP_PATCH void trackDraw(Gfx** gdl, Mtx** mtxs, Vertex** vtxs, Triangle** pol
     } else {
         gEXMatrixGroupSimpleNormalAuto(gMainDL++, G_EX_ID_AUTO, G_EX_NOPUSH, G_MTX_MODELVIEW, G_EX_EDIT_NONE);
     }
-    // @recomp: Anything drawn after this is world geometry again.
-    recomp_restore_camera_projection(&gMainDL);
     camSetupFullscreenViewport(&gMainDL);
     *gdl = gMainDL;
     *mtxs = gWorldRSPMatrices;
@@ -508,7 +518,7 @@ RECOMP_PATCH void trackDrawMain(void) {
     diRcpTrace(gMainDL, 0, "track/track.c", 1341);
     // @recomp: The other Newclouds draw entry point, tagged as skybox for the
     // same reason as func4 in the caller — see the note there.
-    recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_TRANSFORM_ID);
+    recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_ID_CLOUDS_LATE);
     gDLL_9_Newclouds->vtbl->func6(&gMainDL, gUpdateRate, 0);
     recomp_restore_camera_projection(&gMainDL);
     // @recomp: Tag projgfx matrices
@@ -522,7 +532,7 @@ RECOMP_PATCH void trackDrawMain(void) {
         // @recomp: Minic is undecompiled too, but it only draws under the sky
         // flag, so treat it as sky as well. The other remaining candidate for the
         // fog layer alongside DLL 8 above.
-        recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_TRANSFORM_ID);
+        recomp_retag_camera_projection(&gMainDL, PROJECTION_SKYBOX_ID_MINIC);
         // @recomp: Tag minic matrices
         if (recomp_skipCameraInterp || recomp_skipAllInterp) {
             gEXMatrixGroupSkipAll(gMainDL++, MINIC_MTX_GROUP_ID, G_EX_NOPUSH, G_MTX_MODELVIEW, G_EX_EDIT_NONE);

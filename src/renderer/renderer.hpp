@@ -47,7 +47,12 @@ namespace dino::renderer {
     // Stereoscopic 3D settings. Thread-safe: the UI thread calls this whenever a
     // slider moves, and the value is picked up by the render thread at the top of
     // the next frame. Sliders are clamped here, so callers may pass raw UI values.
-    void set_stereo_config(RT64::UserConfiguration::StereoMode mode, uint32_t separation, uint32_t convergence, uint32_t hud_depth);
+    // convergence arrives in TENTHS of its slider (1..1000 = 0.1..100), so the
+    // depth-driven loop's continuous solve does not quantise into visible steps.
+    // comfort_target is signed thousandths of screen width of permitted pop-out.
+    void set_stereo_config(RT64::UserConfiguration::StereoMode mode, uint32_t separation, uint32_t convergence,
+                           uint32_t hud_depth, bool auto_convergence, int32_t comfort_target,
+                           uint32_t ghost_contrast, uint32_t ghost_black_floor);
 
     // True when the current graphics API can drive a LeiaSR panel (D3D12 only).
     // The config UI greys the LeiaSR mode out when this is false.

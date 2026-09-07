@@ -131,13 +131,32 @@ namespace dino::config {
 
     struct StereoSettings {
         StereoMode mode = StereoMode::Off;
-        // 0..100. See kSeparationWorldScale in rt64_projection_processor.cpp for
-        // how these map onto Dinosaur Planet's world units.
-        int separation = 50;
-        // 1..100. Floors at 1 because the off-axis shear divides by it.
-        int convergence = 20;
-        // 0..100, 50 = screen plane.
+        // 0..100, mapping linearly onto 0..0.10 of screen width. Under the
+        // clip-space parameterization this IS the projection shear, so the value
+        // is the background disparity the viewer sees — see kSeparationPerSlider
+        // in rt64_projection_processor.cpp. The default reproduces what the
+        // previous world-units form produced at its own defaults on a 16:9
+        // window.
+        int separation = 18;
+        // Convergence distance in TENTHS of its slider, 10..1000 (= 1.0..100.0),
+        // which is also game units 1:1. Carried in tenths because the
+        // depth-driven loop solves for a continuous value and would otherwise
+        // quantise into visible 10-unit steps.
+        int convergence_tenths = 200;
+        // 0..100, 50 = screen plane. The resulting shift scales with separation,
+        // so the HUD goes flat along with the world at separation 0.
         int hud_depth = 35;
+        // Depth-driven auto-convergence: pulls convergence in when something
+        // gets close, never pushes it out past the slider.
+        bool auto_convergence = false;
+        // Permitted pop-out for that loop, in thousandths of screen width.
+        // Signed: 0 puts the screen plane exactly on the nearest object, and
+        // negative values put the whole scene behind the glass.
+        int comfort_target = 5;
+        // Ghost reduction (anti-crosstalk) range compression, applied in the
+        // compose shader. 100 / 0 are exact no-ops.
+        int ghost_contrast = 100;
+        int ghost_black_floor = 0;
 
         auto operator<=>(const StereoSettings&) const = default;
     };

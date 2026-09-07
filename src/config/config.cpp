@@ -1,5 +1,7 @@
 #include "config.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -367,18 +369,68 @@ void reset_graphics_options() {
 // forking a second submodule for a Dino-only feature.
 void stereo_settings_to_json(nlohmann::json& j, const StereoSettings& settings) {
     j["stereo_mode"] = settings.mode;
-    j["stereo_separation"] = settings.separation;
-    j["stereo_convergence"] = settings.convergence;
+    // Deliberately NOT the old "stereo_separation" / "stereo_convergence" keys:
+    // both changed meaning when the stereo math moved to the clip-space
+    // parameterization, and writing the new values under the old names would
+    // make an older build read them as world-units sliders. The absence of these
+    // keys is also what triggers the one-time conversion below.
+    j["stereo_separation_clip"] = settings.separation;
+    j["stereo_convergence_tenths"] = settings.convergence_tenths;
     j["stereo_hud_depth"] = settings.hud_depth;
+    j["stereo_auto_convergence"] = settings.auto_convergence;
+    j["stereo_comfort_target"] = settings.comfort_target;
+    j["stereo_ghost_contrast"] = settings.ghost_contrast;
+    j["stereo_ghost_black_floor"] = settings.ghost_black_floor;
+}
+
+// One-time conversion of a profile saved before the stereo math moved to the
+// clip-space parameterization (dynamic3d 2.2).
+//
+// The old form built the projection shear as (sep_world / 2 / conv_world) *
+// m[0][0], with sep_world = slider * 0.15 and conv_world = slider * 10. The new
+// form's shear IS the separation, so the exact equivalent is
+//
+//     separation = (old_sep * 0.15) / (2 * old_conv * 10) * m00
+//
+// evaluated at the reference 16:9 projection scale the renderer now uses
+// (0.9742786 — see kReferenceProjectionScale). Dividing by the new slider's
+// 0.001-per-step gives the slider position, which collapses to a single
+// constant. At the old defaults (50, 20) this returns 18, which is the new
+// default — so a user who never touched the sliders sees no change at all, and
+// one who did keeps their own picture rather than a 2.7x stronger one.
+static int convert_legacy_stereo_separation(int old_separation, int old_convergence) {
+    constexpr double kLegacyToClipSlider = (0.15 * 0.9742786) / (2.0 * 10.0 * 0.001);
+    if (old_convergence < 1) {
+        old_convergence = 1;
+    }
+    const double converted = (static_cast<double>(old_separation) * kLegacyToClipSlider) / static_cast<double>(old_convergence);
+    return std::clamp(static_cast<int>(std::lround(converted)), 0, 100);
 }
 
 void stereo_settings_from_json(const nlohmann::json& j, StereoSettings& settings) {
     const StereoSettings defaults{};
     settings.mode = from_or_default(j, "stereo_mode", defaults.mode);
-    settings.separation = std::clamp(from_or_default(j, "stereo_separation", defaults.separation), 0, 100);
-    // Convergence floors at 1: the off-axis shear divides by it.
-    settings.convergence = std::clamp(from_or_default(j, "stereo_convergence", defaults.convergence), 1, 100);
+
+    // Gate the conversion on the NEW key being absent, so it fires exactly once
+    // and never touches an already-converted profile.
+    if (!j.contains("stereo_separation_clip") && j.contains("stereo_separation")) {
+        const int legacy_separation = std::clamp(from_or_default(j, "stereo_separation", 50), 0, 100);
+        const int legacy_convergence = std::clamp(from_or_default(j, "stereo_convergence", 20), 1, 100);
+        settings.separation = convert_legacy_stereo_separation(legacy_separation, legacy_convergence);
+        settings.convergence_tenths = std::clamp(legacy_convergence * 10, 10, 1000);
+    }
+    else {
+        settings.separation = std::clamp(from_or_default(j, "stereo_separation_clip", defaults.separation), 0, 100);
+        // Floors at 10 (a convergence of 1.0) as a comfort limit. Nothing divides
+        // by convergence any more, so this is no longer a numerical guard.
+        settings.convergence_tenths = std::clamp(from_or_default(j, "stereo_convergence_tenths", defaults.convergence_tenths), 10, 1000);
+    }
+
     settings.hud_depth = std::clamp(from_or_default(j, "stereo_hud_depth", defaults.hud_depth), 0, 100);
+    settings.auto_convergence = from_or_default(j, "stereo_auto_convergence", defaults.auto_convergence);
+    settings.comfort_target = std::clamp(from_or_default(j, "stereo_comfort_target", defaults.comfort_target), -50, 60);
+    settings.ghost_contrast = std::clamp(from_or_default(j, "stereo_ghost_contrast", defaults.ghost_contrast), 0, 100);
+    settings.ghost_black_floor = std::clamp(from_or_default(j, "stereo_ghost_black_floor", defaults.ghost_black_floor), 0, 100);
 }
 
 bool save_graphics_config(const std::filesystem::path& path) {
