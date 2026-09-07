@@ -5,13 +5,16 @@
 # Input elf and rom files
 *.elf
 *.z64
+/rom
+
+# Linux build output
+build/
+build-*/
 
 # Output C files
 RecompiledFuncs/
 RecompiledPatches/
 
-# Linux build output
-build/
 *.o
 
 # Windows build output
