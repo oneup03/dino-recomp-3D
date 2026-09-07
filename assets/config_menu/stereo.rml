@@ -3,7 +3,7 @@
     </head>
     <body>
         <form class="config__form config-stereo">
-            <div class="config__hz-wrapper" style="tab-index: auto; nav: auto">
+            <div class="config__hz-wrapper">
                 <div class="config__wrapper" data-event-mouseout="set_cur_config_index(-1)">
                     <!-- Output mode -->
                     <div class="config-option" data-event-mouseover="set_cur_config_index(0)">
@@ -16,7 +16,7 @@
                                 data-checked="stereo_mode"
                                 value="0"
                                 id="stereo_off"
-                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider; nav-right:#stereo_sbs;"
                             />
                             <label class="config-option__tab-label" for="stereo_off">Off</label>
                             <input type="radio"
@@ -26,7 +26,7 @@
                                 data-checked="stereo_mode"
                                 value="1"
                                 id="stereo_sbs"
-                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider; nav-left:#stereo_off; nav-right:#stereo_tab;"
                             />
                             <label class="config-option__tab-label" for="stereo_sbs">Side by Side</label>
                             <input type="radio"
@@ -36,7 +36,7 @@
                                 data-checked="stereo_mode"
                                 value="2"
                                 id="stereo_tab"
-                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider; nav-left:#stereo_sbs; nav-right:#stereo_row;"
                             />
                             <label class="config-option__tab-label" for="stereo_tab">Top and Bottom</label>
                             <input type="radio"
@@ -46,7 +46,7 @@
                                 data-checked="stereo_mode"
                                 value="3"
                                 id="stereo_row"
-                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider; nav-left:#stereo_tab; nav-right:#stereo_col;"
                             />
                             <label class="config-option__tab-label" for="stereo_row">Row Interlaced</label>
                             <input type="radio"
@@ -56,7 +56,7 @@
                                 data-checked="stereo_mode"
                                 value="4"
                                 id="stereo_col"
-                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider; nav-left:#stereo_row; nav-right:#stereo_checker;"
                             />
                             <label class="config-option__tab-label" for="stereo_col">Column Interlaced</label>
                             <input type="radio"
@@ -66,7 +66,7 @@
                                 data-checked="stereo_mode"
                                 value="5"
                                 id="stereo_checker"
-                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider; nav-left:#stereo_col; nav-right:#stereo_anaglyph;"
                             />
                             <label class="config-option__tab-label" for="stereo_checker">Checkerboard</label>
                             <input type="radio"
@@ -76,7 +76,8 @@
                                 data-checked="stereo_mode"
                                 value="6"
                                 id="stereo_anaglyph"
-                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider; nav-left:#stereo_checker;"
+                                data-style-nav-right="leiasr_supported ? '#stereo_leiasr' : 'none'"
                             />
                             <label class="config-option__tab-label" for="stereo_anaglyph">Anaglyph</label>
                             <input type="radio"
@@ -87,7 +88,7 @@
                                 data-checked="stereo_mode"
                                 value="7"
                                 id="stereo_leiasr"
-                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider"
+                                style="nav-up:#tab_stereo; nav-down:#stereo_separation_slider; nav-left:#stereo_anaglyph;"
                             />
                             <label class="config-option__tab-label" for="stereo_leiasr">LeiaSR</label>
                         </div>
@@ -120,8 +121,9 @@
                                 data-event-focus="set_cur_config_index(2)"
                                 id="stereo_convergence_slider"
                                 type="range"
-                                min="1"
-                                max="100"
+                                min="10"
+                                max="1000"
+                                step="5"
                                 data-attrif-disabled="stereo_mode == '0'"
                                 style="flex:1;margin: 0dp;nav-up:#stereo_separation_slider;nav-down:#stereo_hud_depth_slider;"
                                 data-value="stereo_convergence"
@@ -141,14 +143,100 @@
                                 min="0"
                                 max="100"
                                 data-attrif-disabled="stereo_mode == '0'"
-                                style="flex:1;margin: 0dp;nav-up:#stereo_convergence_slider;nav-down:#stereo_off;"
+                                style="flex:1;margin: 0dp;nav-up:#stereo_convergence_slider;nav-down:#stereo_auto_conv_off;"
                                 data-value="stereo_hud_depth"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Auto convergence -->
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(4)">
+                        <label class="config-option__title">Auto Convergence</label>
+                        <div class="config-option__list">
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(4)"
+                                name="stereo_auto_convergence"
+                                data-checked="stereo_auto_convergence"
+                                value="0"
+                                id="stereo_auto_conv_off"
+                                data-attrif-disabled="stereo_mode == '0'"
+                                style="nav-up:#stereo_hud_depth_slider"
+                                data-style-nav-down="stereo_auto_convergence == '1' ? '#stereo_comfort_target_slider' : '#stereo_ghost_contrast_slider'"
+                            />
+                            <label class="config-option__tab-label" for="stereo_auto_conv_off">Off</label>
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(4)"
+                                name="stereo_auto_convergence"
+                                data-checked="stereo_auto_convergence"
+                                value="1"
+                                id="stereo_auto_conv_on"
+                                data-attrif-disabled="stereo_mode == '0'"
+                                style="nav-up:#stereo_hud_depth_slider"
+                                data-style-nav-down="stereo_auto_convergence == '1' ? '#stereo_comfort_target_slider' : '#stereo_ghost_contrast_slider'"
+                            />
+                            <label class="config-option__tab-label" for="stereo_auto_conv_on">On</label>
+                        </div>
+                    </div>
+
+                    <!-- Comfort target -->
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(5)">
+                        <label class="config-option__title">Pop-out Limit</label>
+                        <div class="config-option__list">
+                            <input
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(5)"
+                                id="stereo_comfort_target_slider"
+                                type="range"
+                                min="-50"
+                                max="60"
+                                data-attrif-disabled="stereo_mode == '0' || stereo_auto_convergence == '0'"
+                                style="flex:1;margin: 0dp;nav-up:#stereo_auto_conv_off;nav-down:#stereo_ghost_contrast_slider;"
+                                data-value="stereo_comfort_target"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Ghost reduction: contrast -->
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(6)">
+                        <label class="config-option__title">Ghosting: Contrast</label>
+                        <div class="config-option__list">
+                            <input
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(6)"
+                                id="stereo_ghost_contrast_slider"
+                                type="range"
+                                min="0"
+                                max="100"
+                                data-attrif-disabled="stereo_mode == '0'"
+                                style="flex:1;margin: 0dp;nav-down:#stereo_ghost_black_floor_slider;"
+                                data-style-nav-up="stereo_auto_convergence == '1' ? '#stereo_comfort_target_slider' : '#stereo_auto_conv_off'"
+                                data-value="stereo_ghost_contrast"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Ghost reduction: black floor -->
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(7)">
+                        <label class="config-option__title">Ghosting: Black Floor</label>
+                        <div class="config-option__list">
+                            <input
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(7)"
+                                id="stereo_ghost_black_floor_slider"
+                                type="range"
+                                min="0"
+                                max="100"
+                                data-attrif-disabled="stereo_mode == '0'"
+                                style="flex:1;margin: 0dp;nav-up:#stereo_ghost_contrast_slider;nav-down:#stereo_off;"
+                                data-value="stereo_ghost_black_floor"
                             />
                         </div>
                     </div>
                 </div>
 
-                <div class="config__wrapper_scroll">
+                <div class="config__wrapper">
                     <p data-if="cur_config_index == -1">
                         Renders the game in stereoscopic 3D by drawing the scene twice, once per eye.
                         <br />
@@ -168,10 +256,10 @@
                         <b>Note: LeiaSR requires the Direct3D 12 graphics API and the Leia SR Platform runtime. It is unavailable otherwise.</b>
                     </p>
                     <p data-if="cur_config_index == 1">
-                        Sets the distance between the two virtual eyes, which controls how strong the 3D effect is.
+                        Sets how strong the 3D effect is, as the on-screen distance between the two eye images of a far-away object.
                         <br />
                         <br />
-                        Higher values give more depth but are more tiring to look at, and can be uncomfortable when something passes close to the camera. If the image is hard to fuse into one picture, lower this first.
+                        The scale is a percentage of your screen's width, so <b>100</b> puts distant objects a tenth of the screen apart. Above roughly that point the eyes are forced outward and the image cannot be fused at all, on any screen — and the larger your display, the lower that ceiling sits. If the image is hard to fuse into one picture, lower this first.
                     </p>
                     <p data-if="cur_config_index == 2">
                         Sets the distance at which objects sit exactly on the screen plane.
@@ -184,6 +272,33 @@
                         <br />
                         <br />
                         <b>50</b> places it flat on the screen. Lower values push it behind the screen, higher values bring it forward. If the HUD is hard to read, or nearby scenery appears to cut through it, adjust this.
+                        <br />
+                        <br />
+                        The shift scales with <b>3D Separation</b>, so turning the 3D effect down flattens the HUD along with the world.
+                    </p>
+                    <p data-if="cur_config_index == 4">
+                        Watches the depth buffer and pulls convergence in by itself when something gets close to the camera, so nearby objects do not pop uncomfortably far out of the screen.
+                        <br />
+                        <br />
+                        The <b>3D Convergence</b> slider stays the limit: this only ever moves the screen plane closer than you set it, never further. Turning it off snaps straight back to your slider value.
+                    </p>
+                    <p data-if="cur_config_index == 5">
+                        How far Auto Convergence lets the nearest object come out of the screen, in thousandths of your screen's width.
+                        <br />
+                        <br />
+                        <b>0</b> puts the screen plane exactly on the nearest object, so nothing pops out at all. Negative values push the whole scene behind the glass, which is the most restful setting. Higher values allow more pop-out before the correction engages.
+                    </p>
+                    <p data-if="cur_config_index == 6">
+                        Reduces ghosting — a faint copy of one eye's image bleeding into the other — by squeezing the picture's contrast before it reaches the display.
+                        <br />
+                        <br />
+                        <b>100</b> is off. Lower values reduce ghosting on every kind of 3D display, at the cost of contrast across the whole image. Try <b>90</b> first and go lower only if edges still ghost.
+                    </p>
+                    <p data-if="cur_config_index == 7">
+                        The other ghosting control: raises the black level instead of squeezing contrast, leaving highlights alone.
+                        <br />
+                        <br />
+                        <b>0</b> is off. This one only helps on displays that cancel crosstalk themselves — autostereoscopic panels such as <b>LeiaSR</b> in particular — where ghosting is the display's own correction being clipped at black. A little goes a long way: <b>2</b>–<b>5</b> is usually enough, and blacks turn grey quickly above that.
                     </p>
                 </div>
             </div>

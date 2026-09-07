@@ -49,6 +49,10 @@
 .config-option__list {
     display: flex;
     flex-direction: row;
+    // A row with more choices than fits its column -- the eight stereo output
+    // modes, or a radio row trailed by a long __details note -- wraps onto
+    // another line instead of squeezing or running past the column edge.
+    flex-wrap: wrap;
     align-items: flex-start;
     justify-content: flex-start;
     width: 100%;

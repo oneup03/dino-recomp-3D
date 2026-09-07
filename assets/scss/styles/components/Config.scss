@@ -54,6 +54,19 @@
     }
 }
 
+// The graphics and 3D tabs carry more options than the modal is tall, so both of
+// their columns take a scrollbar of their own. Directional navigation scrolls the
+// focused option into view by itself once there is a scroll container to move,
+// but it will not descend into one that isn't focusable, so these two tabs also
+// have the tab strip name their first option outright -- see config_tab_entry_id()
+// in ui_config.cpp.
+.config-graphics, .config-stereo {
+    .config__wrapper {
+        max-height: 100%;
+        overflow-y: auto;
+    }
+}
+
 .config__hz-wrapper_scroll {
     position: relative;
     overflow-y: auto;
@@ -67,31 +80,6 @@
     border-bottom-left-radius: $border-radius-modal;
     background-color: $color-bg-shadow;
     text-align: left;
-}
-
-.config__wrapper_scroll {
-    width: 50%;
-        
-    &:last-child {
-        position: fixed;
-        margin-left: 50%;
-    }
-
-    p {
-        @extend %body;
-        padding: space(16);
-        line-height: space(28);
-        white-space: pre-line;
-
-        b {
-            color: $color-primary;
-        }
-
-        i {
-            color: $color-error;
-            font-style: normal;
-        }
-    }
 }
 
 .config__hz-wrapper {
