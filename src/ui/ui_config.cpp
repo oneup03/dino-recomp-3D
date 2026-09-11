@@ -100,10 +100,6 @@ static int scanned_input_index = -1;
 static int focused_input_index = -1;
 static int focused_config_option_index = -1;
 
-static bool msaa2x_supported = false;
-static bool msaa4x_supported = false;
-static bool msaa8x_supported = false;
-static bool sample_positions_supported = false;
 
 static bool cont_active = true;
 
@@ -721,7 +717,6 @@ public:
         bind_option(constructor, "wm_option", &new_options.wm_option);
         bind_option(constructor, "ar_option", &new_options.ar_option);
         bind_option(constructor, "hr_option", &new_options.hr_option);
-        bind_option(constructor, "msaa_option", &new_options.msaa_option);
         bind_option(constructor, "rr_option", &new_options.rr_option);
         constructor.BindFunc("rr_manual_value",
             [](Rml::Variant& out) {
@@ -795,19 +790,6 @@ public:
             }
         });
 
-        constructor.Bind("msaa2x_supported", &msaa2x_supported);
-        constructor.Bind("msaa4x_supported", &msaa4x_supported);
-        constructor.Bind("msaa8x_supported", &msaa8x_supported);
-        constructor.Bind("sample_positions_supported", &sample_positions_supported);
-
-        // MSAA and stereo are mutually exclusive: RT64 redirects the right-eye
-        // pass to an override render target, and that redirection is itself
-        // MSAA-gated, so with both on the right eye simply never renders. The
-        // MSAA radio buttons key their disabled state off this.
-        constructor.BindFunc("stereo_active",
-            [](Rml::Variant& out) {
-                out = (dino::config::get_stereo_settings().mode != dino::config::StereoMode::Off);
-            });
 
         graphics_model_handle = constructor.GetModelHandle();
     }
@@ -833,11 +815,6 @@ public:
                 if ((value >= 0) && (value < static_cast<int>(dino::config::StereoMode::OptionCount))) {
                     settings.mode = static_cast<dino::config::StereoMode>(value);
                     dino::config::set_stereo_settings(settings);
-                    // The MSAA options in the graphics tab grey out while stereo
-                    // is on, so that model needs to re-evaluate too.
-                    if (graphics_model_handle) {
-                        graphics_model_handle.DirtyVariable("stereo_active");
-                    }
                 }
             });
 
@@ -1233,10 +1210,6 @@ void dino::config::set_debug_recompsave_enabled(bool enabled) {
 }
 
 void recompui::update_supported_options() {
-    msaa2x_supported = dino::renderer::RT64MaxMSAA() >= RT64::UserConfiguration::Antialiasing::MSAA2X;
-    msaa4x_supported = dino::renderer::RT64MaxMSAA() >= RT64::UserConfiguration::Antialiasing::MSAA4X;
-    msaa8x_supported = dino::renderer::RT64MaxMSAA() >= RT64::UserConfiguration::Antialiasing::MSAA8X;
-    sample_positions_supported = dino::renderer::RT64SamplePositionsSupported();
     
     new_options = ultramodern::renderer::get_graphics_config();
 

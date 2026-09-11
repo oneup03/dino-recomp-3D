@@ -30,7 +30,11 @@ constexpr auto res_default            = ultramodern::renderer::Resolution::Auto;
 constexpr auto hr_default             = ultramodern::renderer::HUDRatioMode::Clamp16x9;
 constexpr auto api_default            = ultramodern::renderer::GraphicsApi::Auto;
 constexpr auto ar_default             = ultramodern::renderer::AspectRatio::Expand;
-constexpr auto msaa_default           = ultramodern::renderer::Antialiasing::MSAA2X;
+// MSAA is not offered by this port and is forced off everywhere. Stereo renders
+// the second eye into a separate target, which MSAA is not compatible with, and
+// an option that has to be disabled for the feature the port exists for is not
+// worth carrying. See the forced load below.
+constexpr auto msaa_default           = ultramodern::renderer::Antialiasing::None;
 constexpr auto rr_default             = ultramodern::renderer::RefreshRate::Original;
 constexpr auto hpfb_default           = ultramodern::renderer::HighPrecisionFramebuffer::On;
 constexpr int ds_default              = 1;
@@ -115,7 +119,10 @@ void graphics_config_from_json(const nlohmann::json& j, ultramodern::renderer::G
     config.api_option       = from_or_default(j, "api_option",      api_default);
     config.ds_option        = from_or_default(j, "ds_option",       ds_default);
     config.ar_option        = from_or_default(j, "ar_option",       ar_default);
-    config.msaa_option      = from_or_default(j, "msaa_option",     msaa_default);
+    // Deliberately NOT read back from the file. Configs written before the
+    // option was removed still carry MSAA2X, and honouring that would silently
+    // re-enable it for exactly the users who already had it on.
+    config.msaa_option      = msaa_default;
     config.rr_option        = from_or_default(j, "rr_option",       rr_default);
     config.hpfb_option      = from_or_default(j, "hpfb_option",     hpfb_default);
     config.rr_manual_value  = from_or_default(j, "rr_manual_value", rr_manual_default);
