@@ -130,29 +130,42 @@ namespace dino::config {
     });
 
     struct StereoSettings {
+        // The values below are the ones this port was actually tuned on, rather
+        // than the conservative placeholders it started with.
+        //
+        // Off, unlike everything below it. The rest of these are tuning that
+        // holds whatever the display is; the mode names specific hardware, and
+        // defaulting to a panel the user may not own would greet them with a
+        // side-by-side double image on first run.
         StereoMode mode = StereoMode::Off;
         // 0..100, mapping linearly onto 0..0.10 of screen width. Under the
         // clip-space parameterization this IS the projection shear, so the value
         // is the background disparity the viewer sees — see kSeparationPerSlider
-        // in rt64_projection_processor.cpp. The default reproduces what the
-        // previous world-units form produced at its own defaults on a 16:9
-        // window.
-        int separation = 18;
+        // in rt64_projection_processor.cpp. 30 is 3% of screen width at infinity,
+        // comfortably inside the ~10.5% divergence ceiling on a 27-inch panel and
+        // lower again in proportion on anything larger.
+        int separation = 30;
         // Convergence distance in TENTHS of its slider, 10..1000 (= 1.0..100.0),
         // which is also game units 1:1. Carried in tenths because the
         // depth-driven loop solves for a continuous value and would otherwise
         // quantise into visible 10-unit steps.
-        int convergence_tenths = 200;
+        //
+        // This is the screen plane, so it also sets where depth stops reading:
+        // disparity saturates hyperbolically, and past roughly 2-3x this distance
+        // everything is nearly at the background plane whatever its real depth.
+        int convergence_tenths = 160;
         // 0..100, 50 = screen plane. The resulting shift scales with separation,
         // so the HUD goes flat along with the world at separation 0.
-        int hud_depth = 35;
+        int hud_depth = 50;
         // Depth-driven auto-convergence: pulls convergence in when something
-        // gets close, never pushes it out past the slider.
-        bool auto_convergence = false;
+        // gets close, never pushes it out past the slider. On by default -- it
+        // only ever protects, and the convergence above is a ceiling it cannot
+        // exceed, so leaving it off gives up comfort for nothing.
+        bool auto_convergence = true;
         // Permitted pop-out for that loop, in thousandths of screen width.
         // Signed: 0 puts the screen plane exactly on the nearest object, and
         // negative values put the whole scene behind the glass.
-        int comfort_target = 5;
+        int comfort_target = 12;
         // Ghost reduction (anti-crosstalk) range compression, applied in the
         // compose shader. 100 / 0 are exact no-ops.
         int ghost_contrast = 100;
