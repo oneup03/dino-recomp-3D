@@ -267,6 +267,23 @@ int main(int argc, char** argv) {
 
     recomp::start(config);
 
+    // Persist settings on the way out.
+    //
+    // Until now the only thing that wrote the config files was CLOSING the
+    // config menu, which quietly made persistence depend on how the session
+    // ended rather than on what the user changed. Before a game starts that is
+    // invisible, because reaching the launcher's start button means closing the
+    // menu first, so anything changed there is already on disk. In game there is
+    // no such step: the menu carries its own Quit Game button, and the window
+    // close goes straight to the quit prompt, so every exit route from inside the
+    // menu dropped whatever had just been changed -- which is why 3D settings
+    // appeared to save only when they were set before launching.
+    //
+    // Placed here rather than at each ultramodern::quit() call site -- there are
+    // four, in input handling, the quit prompt, the launcher and the game-side
+    // API -- so that no exit path added later can forget it.
+    dino::config::save_config();
+
 #ifdef _WIN32
     // End high resolution timing period.
     timeEndPeriod(1);
