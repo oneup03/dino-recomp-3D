@@ -39,7 +39,11 @@ jobs:
   build-windows:
     name: Windows (x64)
     needs: prepare
-    runs-on: windows-latest
+    # Pinned, like the Linux runners. windows-latest has moved to VS 18 and
+    # clang 22, which now provides _m_prefetch as a builtin -- that collides with
+    # the compatibility shim in the vendored SDL 2.26.3 headers, written back
+    # when clang 11 did not have it, and the build fails in SDL_endian.h.
+    runs-on: windows-2022
     steps:
       - name: Checkout
         uses: actions/checkout@v4
